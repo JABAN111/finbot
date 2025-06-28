@@ -11,12 +11,12 @@ import (
 const offset = 0 //??
 
 func main() {
+	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
 	err := godotenv.Load()
 	if err != nil {
-		panic(fmt.Sprintf("fail to read from .env file, error: %v", err))
+		log.Warn("fail to read from .env file", "err", err)
 	}
-
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	token := os.Getenv("TELEGRAM_SECRET")
 	if len(token) == 0 {
