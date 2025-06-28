@@ -2,20 +2,45 @@ package main
 
 import (
 	"fmt"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/joho/godotenv"
+	"log/slog"
+	"os"
 )
 
-//TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.</p>
+const offset = 0 //??
 
 func main() {
-	//TIP <p>Press <shortcut actionId="ShowIntentionActions"/> when your caret is at the underlined text
-	// to see how GoLand suggests fixing the warning.</p><p>Alternatively, if available, click the lightbulb to view possible fixes.</p>
-	s := "gopher"
-	fmt.Println("Hello and welcome, %s!", s)
+	err := godotenv.Load()
+	if err != nil {
+		panic(fmt.Sprintf("fail to read from .env file, error: %v", err))
+	}
 
-	for i := 1; i <= 5; i++ {
-		//TIP <p>To start your debugging session, right-click your code in the editor and select the Debug option.</p> <p>We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-		// for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.</p>
-		fmt.Println("i =", 100/i)
+	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
+	token := os.Getenv("TELEGRAM_SECRET")
+	if len(token) == 0 {
+		log.Error("telegram secret is not specified")
+		os.Exit(1)
+	}
+
+	bot, err := tgbotapi.NewBotAPI(token)
+	bot.Debug = true
+	if err != nil {
+		log.Error("fail to create bot", "error", err)
+		os.Exit(1)
+	}
+
+	tgConfig := tgbotapi.NewUpdate(offset)
+	tgConfig.Timeout = 30
+
+	updatesChan := bot.GetUpdatesChan(tgConfig)
+	for data := range updatesChan {
+		if data.Message == nil {
+			continue
+		}
+
+		log.Info("got message", "message", data.Message)
+		fmt.Printf("data struct: %v\n", data)
 	}
 }
