@@ -1,0 +1,7 @@
+services:
+  finbot:
+    image: finbot
+    build:
+      context: .
+    env_file:
+      - .env
