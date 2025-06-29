@@ -60,3 +60,10 @@ func getNotionClient() *notion.Client {
 
 	return notion.NewClient(token)
 }
+
+func TestNotionManager_QueryDatabase(t *testing.T) {
+	c := getNotionClient()
+	nm := NewNotionManager(c)
+
+	nm.QueryDatabase()
+}
