@@ -80,31 +80,24 @@ func (n *NotionManager) InsertToDb(ctx context.Context) {
 	databaseID := "21d3d8e126bf8022a26dc42a29697985"
 
 	props := notion.DatabasePageProperties{
-		WHO_CHANGE: notion.DatabasePageProperty{
-			Type: notion.DBPropTypeTitle,
-			Title: []notion.RichText{
-				{
-					Text: &notion.Text{Content: "Миша"},
-				},
-			},
-		},
-		OPERATION_SUM: notion.DatabasePageProperty{
-			Type:   notion.DBPropTypeNumber,
-			Number: notion.Float64Ptr(32918),
-		},
-		OPERATION_DATE: notion.DatabasePageProperty{
-			Type: notion.DBPropTypeDate,
-			Date: &notion.Date{
-				Start: notion.NewDateTime(time.Now(), true),
-				//Start: notion.TimePtr(time.Date(2025, 6, 25, 0, 0, 0, 0, time.UTC)),
-			},
-		},
 		COMMENT: notion.DatabasePageProperty{
-			Type: notion.DBPropTypeRichText,
-			RichText: []notion.RichText{
+			Title: []notion.RichText{
 				{
 					Text: &notion.Text{Content: "на июнь месяц"},
 				},
+			},
+		},
+		WHO_CHANGE: notion.DatabasePageProperty{
+			Select: &notion.SelectOptions{
+				Name: "Миша",
+			},
+		},
+		OPERATION_SUM: notion.DatabasePageProperty{
+			Number: notion.Float64Ptr(-32918),
+		},
+		OPERATION_DATE: notion.DatabasePageProperty{
+			Date: &notion.Date{
+				Start: notion.NewDateTime(time.Now(), false),
 			},
 		},
 	}
@@ -113,7 +106,6 @@ func (n *NotionManager) InsertToDb(ctx context.Context) {
 		ParentID:               databaseID,
 		DatabasePageProperties: &props,
 	}
-
 	page, err := n.client.CreatePage(ctx, params)
 	if err != nil {
 		log.Error(fmt.Sprintf("Ошибка создания страницы: %v", err))
