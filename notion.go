@@ -2,10 +2,17 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/dstotijn/go-notion"
 	"log/slog"
+	"time"
+)
+
+const (
+	WHO_CHANGE     = "Кто сделал"
+	OPERATION_SUM  = "Сумма пополнения"
+	OPERATION_DATE = "Дата внесения"
+	COMMENT        = "Комментарий"
 )
 
 type NotionManager struct {
@@ -69,10 +76,48 @@ func (n *NotionManager) QueryDatabase() {
 	}
 }
 
-func jsonToMap(jsonStr string) map[string]interface{} {
-	result := make(map[string]interface{})
-	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
-		panic(err)
+func (n *NotionManager) InsertToDb(ctx context.Context) {
+	databaseID := "21d3d8e126bf8022a26dc42a29697985"
+
+	props := notion.DatabasePageProperties{
+		WHO_CHANGE: notion.DatabasePageProperty{
+			Type: notion.DBPropTypeTitle,
+			Title: []notion.RichText{
+				{
+					Text: &notion.Text{Content: "Миша"},
+				},
+			},
+		},
+		OPERATION_SUM: notion.DatabasePageProperty{
+			Type:   notion.DBPropTypeNumber,
+			Number: notion.Float64Ptr(32918),
+		},
+		OPERATION_DATE: notion.DatabasePageProperty{
+			Type: notion.DBPropTypeDate,
+			Date: &notion.Date{
+				Start: notion.NewDateTime(time.Now(), true),
+				//Start: notion.TimePtr(time.Date(2025, 6, 25, 0, 0, 0, 0, time.UTC)),
+			},
+		},
+		COMMENT: notion.DatabasePageProperty{
+			Type: notion.DBPropTypeRichText,
+			RichText: []notion.RichText{
+				{
+					Text: &notion.Text{Content: "на июнь месяц"},
+				},
+			},
+		},
 	}
-	return result
+	params := notion.CreatePageParams{
+		ParentType:             notion.ParentTypeDatabase,
+		ParentID:               databaseID,
+		DatabasePageProperties: &props,
+	}
+
+	page, err := n.client.CreatePage(ctx, params)
+	if err != nil {
+		log.Error(fmt.Sprintf("Ошибка создания страницы: %v", err))
+		return
+	}
+	log.Info(fmt.Sprintf("Страница создана: %s", page.URL))
 }

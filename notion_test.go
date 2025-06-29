@@ -67,3 +67,12 @@ func TestNotionManager_QueryDatabase(t *testing.T) {
 
 	nm.QueryDatabase()
 }
+
+func TestNotionManager_InsertToDb(t *testing.T) {
+
+	c := getNotionClient()
+	nm := NewNotionManager(c)
+
+	nm.InsertToDb(context.Background())
+
+}
