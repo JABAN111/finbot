@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"github.com/dstotijn/go-notion"
 	"log/slog"
 	"time"
@@ -22,6 +24,12 @@ const (
 	columnCategory      = "Категория"
 	columnStatus        = "Статус"
 	columnOperationDate = "Дата внесения"
+)
+
+var (
+	errMissedField            = errors.New("miss required field")
+	errNegativeSum            = errors.New("sum must be positive")
+	errInvalidOperationStatus = errors.New("invalid operation status")
 )
 
 type NotionManager struct {
@@ -45,6 +53,20 @@ type InsertOperationDto struct {
 }
 
 func (n NotionManager) InsertOperation(ctx context.Context, databaseID string, operationDTO InsertOperationDto) error {
+	if operationDTO.Status != OperationStatusRefill && operationDTO.Status != OperationRemove {
+		return errInvalidOperationStatus
+	}
+	if operationDTO.Sum < 0 {
+		return errNegativeSum
+	}
+
+	if len(operationDTO.Creator) == 0 {
+		return fmt.Errorf("creator is missed, %e", errMissedField)
+	}
+	if len(operationDTO.Category) == 0 {
+		return fmt.Errorf("category is missed, %e", errMissedField)
+	}
+
 	props := notion.DatabasePageProperties{
 		columnWho: notion.DatabasePageProperty{
 			Select: &notion.SelectOptions{

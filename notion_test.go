@@ -44,6 +44,70 @@ func TestNotionManager_InsertOperation(t *testing.T) {
 				Comment:  "Обычное добавление после теста",
 			},
 			wantErr: false,
+		}, {
+			name: "negative sum",
+			dto: InsertOperationDto{
+				Creator:  "jaba21",
+				Category: "хуюдукты",
+				Sum:      -3219,
+				Status:   OperationRemove,
+				Comment:  "Я дебил",
+			},
+			wantErr: true,
+		}, {
+			name: "empty comment",
+			dto: InsertOperationDto{
+				Creator:  "jaba21",
+				Category: "хуюдукты",
+				Sum:      3219,
+				Status:   OperationStatusRefill,
+				Comment:  "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid status",
+			dto: InsertOperationDto{
+				Creator:  "jaba321",
+				Category: "dsakopdkopsa",
+				Sum:      312321,
+				Status:   "че блять?",
+				Comment:  "нет комментария",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty creator",
+			dto: InsertOperationDto{
+				Creator:  "",
+				Category: "продукты",
+				Sum:      100,
+				Status:   OperationStatusRefill,
+				Comment:  "Тест на пустого создателя",
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty category",
+			dto: InsertOperationDto{
+				Creator:  "jaba368",
+				Category: "",
+				Sum:      200,
+				Status:   OperationStatusRefill,
+				Comment:  "Тест на пустую категорию",
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero sum",
+			dto: InsertOperationDto{
+				Creator:  "jaba368",
+				Category: "продукты",
+				Sum:      0,
+				Status:   OperationStatusRefill,
+				Comment:  "Тест на нулевую сумму",
+			},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
