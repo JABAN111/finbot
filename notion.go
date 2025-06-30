@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-type Color string
 type OperationStatus string
 
 const (
