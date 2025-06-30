@@ -8,11 +8,33 @@ import (
 	"time"
 )
 
+type Color string
+type OperationStatus string
+
 const (
-	WHO_CHANGE     = "Кто сделал"
-	OPERATION_SUM  = "Сумма пополнения"
-	OPERATION_DATE = "Дата внесения"
-	COMMENT        = "Комментарий"
+	OperationStatusRefill = OperationStatus("Пополнение")
+	OperationRemove       = OperationStatus("Снятие")
+)
+
+const (
+	ColorGray   = Color("Gray")
+	ColorBrown  = Color("Brown")
+	ColorOrange = Color("Orange")
+	ColorYellow = Color("Yellow")
+	ColorGreen  = Color("Green")
+	ColorBlue   = Color("Blue")
+	ColorPurple = Color("Purple")
+	ColorPink   = Color("Pink")
+	ColorRed    = Color("Red")
+)
+
+const (
+	ColumnWho           = "Кто"
+	ColumnOperationSum  = "Сумма операции"
+	ColumnComment       = "Комментарий"
+	ColumnCategory      = "Категория"
+	ColumnStatus        = "Статус"
+	ColumnOperationDate = "Дата внесения"
 )
 
 type NotionManager struct {
@@ -25,6 +47,13 @@ func NewNotionManager(client *notion.Client) NotionManager {
 		log:    GetLogger(),
 		client: client,
 	}
+}
+
+type InsertOperationData struct {
+	OperationCreator  string
+	OperationCategory string
+	OperationSum      float64
+	OperationStatus
 }
 
 func (n *NotionManager) PrintPage(ctx context.Context, pageID string) error {
@@ -67,12 +96,6 @@ func (n *NotionManager) QueryDatabase() {
 			panic(err)
 		}
 
-		// Пример чтения свойства Title
-		//p.UnmarshalJSON()
-		//titleProp := jsonToMap(p.Properties)
-
-		//if len(titleProp) > 0 {/
-		//	log.Println("Страница:", titleProp[0].PlainText)
 	}
 }
 
@@ -80,24 +103,35 @@ func (n *NotionManager) InsertToDb(ctx context.Context) {
 	databaseID := "21d3d8e126bf8022a26dc42a29697985"
 
 	props := notion.DatabasePageProperties{
-		COMMENT: notion.DatabasePageProperty{
+		ColumnWho: notion.DatabasePageProperty{
+			Select: &notion.SelectOptions{
+				Name: "Миша",
+			},
+		},
+		ColumnCategory: notion.DatabasePageProperty{
+			Select: &notion.SelectOptions{
+				Name:  "Продуктывdsamklыф",
+				Color: "pu",
+			},
+		},
+		ColumnComment: notion.DatabasePageProperty{
 			Title: []notion.RichText{
 				{
 					Text: &notion.Text{Content: "на июнь месяц"},
 				},
 			},
 		},
-		WHO_CHANGE: notion.DatabasePageProperty{
-			Select: &notion.SelectOptions{
-				Name: "Миша",
-			},
-		},
-		OPERATION_SUM: notion.DatabasePageProperty{
+		ColumnOperationSum: notion.DatabasePageProperty{
 			Number: notion.Float64Ptr(-32918),
 		},
-		OPERATION_DATE: notion.DatabasePageProperty{
+		ColumnOperationDate: notion.DatabasePageProperty{
 			Date: &notion.Date{
 				Start: notion.NewDateTime(time.Now(), false),
+			},
+		},
+		ColumnStatus: notion.DatabasePageProperty{
+			Status: &notion.SelectOptions{
+				Name: "Снятие",
 			},
 		},
 	}
