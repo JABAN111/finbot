@@ -49,11 +49,13 @@ func NewNotionManager(client *notion.Client) NotionManager {
 	}
 }
 
-type InsertOperationData struct {
-	OperationCreator  string
-	OperationCategory string
-	OperationSum      float64
-	OperationStatus
+type InsertOperationDto struct {
+	Creator  string
+	Category string
+	Sum      float64
+	Status   OperationStatus
+	Comment  string
+	Color    Color
 }
 
 func (n *NotionManager) PrintPage(ctx context.Context, pageID string) error {
