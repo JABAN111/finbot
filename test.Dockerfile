@@ -7,4 +7,4 @@ COPY . .
 
 
 
-RUN go test -v ./...
+CMD ["go", "test", "-v", "./..."]
