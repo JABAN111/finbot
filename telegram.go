@@ -8,6 +8,8 @@ import (
 	"sync"
 )
 
+var users = make(map[int64]UserState)
+
 type TelegramManager struct {
 	numWorkers   int
 	bot          *tgbotapi.BotAPI
@@ -34,7 +36,7 @@ func (tm *TelegramManager) ListenAndServe(ctx context.Context) error {
 	var wg sync.WaitGroup
 	wg.Add(tm.numWorkers)
 
-	for range tm.numWorkers {
+	for i := 0; i < tm.numWorkers; i++ {
 		go func() {
 			defer wg.Done()
 			for {
@@ -42,72 +44,21 @@ func (tm *TelegramManager) ListenAndServe(ctx context.Context) error {
 				case <-ctx.Done():
 					tm.log.Warn("context for telegram is done")
 					return
-				case data, ok := <-upChan:
+				case update, ok := <-upChan:
 					if !ok {
 						return
 					}
 
-					if data.Message != nil {
-						msg := tgbotapi.NewMessage(data.Message.Chat.ID, "Выберите действие:")
-						msg.ReplyMarkup = createInlineKeyboard()
-						if _, err := tm.bot.Send(msg); err != nil {
-							tm.log.Error("failed to send message", "error", err)
-						}
+					if update.CallbackQuery != nil {
+						chatID := update.CallbackQuery.ID
+						fmt.Println("Received update from chat ID:", chatID)
 					}
 
-					if data.CallbackQuery != nil {
-						callback := tgbotapi.NewCallback(data.CallbackQuery.ID, "Выбрано: "+data.CallbackQuery.Data)
-						if _, err := tm.bot.Send(callback); err != nil {
-							tm.log.Error("failed to answer callback", "error", err)
-						}
-
-						responseMsg := tgbotapi.NewMessage(
-							data.CallbackQuery.Message.Chat.ID,
-							"Вы выбрали: "+data.CallbackQuery.Data,
-						)
-						msg, err := tm.bot.Send(responseMsg)
-						if err != nil {
-							tm.log.Error("failed to send response message", "error", err)
-						}
-						if _, err := tm.bot.Send(responseMsg); err != nil {
-							tm.log.Error("failed to send response", "error", err)
-						}
-						fmt.Println(msg)
-					}
-					//tm.log.Info("got update", "data", data)
-					//call := tgbotapi.NewCallback("2", "test")
-					//msg, err := tm.bot.Send(call)
-					//if err != nil {
-					//	panic(err)
-					//}
-					//tm.log.Info("got message", "data", msg)
 				}
 			}
 		}()
 	}
+
 	wg.Wait()
-
 	return nil
-}
-
-// processMessage обрабатывает пользовательский запрос и, если необходимо, возвращает ему ответ
-func processMessage(update tgbotapi.Update) (*tgbotapi.Message, error) {
-	return nil, nil
-	//msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-	//msg.ReplyToMessageID = update.Message.MessageID
-	//
-	//return msg, nil
-}
-
-func createInlineKeyboard() tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Кнопка 1", "action_1"),
-			tgbotapi.NewInlineKeyboardButtonData("Кнопка 2", "action_2"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Кнопка с параметрами", "action_with_params?id=123&type=test"),
-			tgbotapi.NewInlineKeyboardButtonURL("Ссылка", "https://google.com"),
-		),
-	)
 }
