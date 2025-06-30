@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
 	"log/slog"
@@ -35,8 +36,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	tgManager := NewTelegramManager(bot, offset, 30, false)
-	if err := tgManager.ListenAndServe(); err != nil {
+	ctx := context.Background()
+	tgManager := NewTelegramManager(bot, offset, 30, 2, false)
+	if err := tgManager.ListenAndServe(ctx); err != nil {
 		panic(err)
 	}
 
