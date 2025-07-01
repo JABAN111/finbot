@@ -120,14 +120,22 @@ func (tm *TelegramManager) setCommands() error {
 func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 	msg := update.Message
 
-	//if update.CallbackQuery != nil {
-	//	return tm.handleCallback(update)
-	//}
+	userState := tm.getCurrentUserState(msg.From.ID)
+
+	if !msg.IsCommand() && !userState.isWaitUserInput {
+		tm.log.Info("message is not command", "user_id", userState, "text", msg.Text)
+		response := tgbotapi.NewMessage(update.Message.Chat.ID, "все хиханьки хаханьки тебе? Жмякни по /start")
+		if _, err := tm.bot.Send(response); err != nil {
+			return err
+		}
+
+		return nil
+	}
 
 	switch msg.Command() {
 	case commandStart:
 		tm.log.Info("Received /start command", "user_id", msg.From.ID)
-		keyboard := tm.createMainInlineCommands()
+		keyboard := createMainInlineCommands()
 		responseMsg := tgbotapi.NewMessage(msg.Chat.ID, "Выберите действие")
 		responseMsg.ReplyMarkup = keyboard
 		_, err := tm.bot.Send(responseMsg)
@@ -163,40 +171,6 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 	}
 
 	return nil
-}
-
-func (tm *TelegramManager) createMainInlineCommands() tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(buttonRefill, buttonRefill),
-			tgbotapi.NewInlineKeyboardButtonData(buttonRemove, buttonRemove),
-		),
-	)
-}
-
-func (tm *TelegramManager) createRefillCommands() tgbotapi.InlineKeyboardMarkup {
-	return tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("текст", "текст"),
-			tgbotapi.NewInlineKeyboardButtonData("назад", "main"),
-		),
-	)
-}
-
-// updateUserState updating slice with users to create new user if missed
-// TODO do we really need it?
-func (tm *TelegramManager) updateUserState(update tgbotapi.Update) {
-	if update.Message == nil {
-		return
-	}
-
-	tm.mu.Lock()
-	currentUserState, exist := tm.users[update.Message.From.ID]
-	if !exist {
-		currentUserState = UserState{}
-		tm.users[update.Message.From.ID] = currentUserState
-	}
-	tm.mu.Unlock()
 }
 
 func (tm *TelegramManager) processCallbackQuery(update tgbotapi.Update) error {
@@ -237,4 +211,16 @@ func (tm *TelegramManager) processCallbackQuery(update tgbotapi.Update) error {
 	//}
 
 	return nil
+}
+
+func (tm *TelegramManager) getCurrentUserState(userID int64) UserState {
+	usState, ok := tm.users[userID]
+
+	if !ok {
+		tm.mu.Lock()
+		tm.users[userID] = UserState{}
+		tm.mu.Unlock()
+	}
+
+	return usState
 }

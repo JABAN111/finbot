@@ -14,6 +14,8 @@ type UserState struct {
 	Category                  string
 	Status                    OperationStatus
 	Comment                   string
+
+	isWaitUserInput bool
 }
 
 func (us *UserState) Reset() {
