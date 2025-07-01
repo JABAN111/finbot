@@ -11,6 +11,7 @@ import (
 
 var (
 	errUnknownCommand = errors.New("get unknown command")
+	errMessageIsNil   = errors.New("message is nil")
 )
 
 const (
@@ -19,26 +20,32 @@ const (
 	commandReset = "reset"
 )
 
-var users = make(map[int64]UserState)
-
 type TelegramManager struct {
 	numWorkers   int
 	bot          *tgbotapi.BotAPI
 	updateConfig tgbotapi.UpdateConfig
 	log          *slog.Logger
-	mu           sync.RWMutex
+	mu           sync.Mutex
+
+	users   map[int64]UserState
+	actions map[string]ButtonAction
 }
 
-func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, debug bool) TelegramManager {
+func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, debug bool) *TelegramManager {
 	bot.Debug = debug
 
 	tgConfig := tgbotapi.NewUpdate(offset)
 	tgConfig.Timeout = timeout
 
-	tm := TelegramManager{
+	mapButtonActions := map[string]ButtonAction{buttonRefill: RefillButtonAction{}, buttonRemove: RemoveButtonAction{}}
+
+	tm := &TelegramManager{
 		bot:        bot,
 		log:        GetLogger(),
 		numWorkers: numWorkers,
+		users:      make(map[int64]UserState),
+		mu:         sync.Mutex{},
+		actions:    mapButtonActions,
 	}
 
 	err := tm.setCommands()
@@ -69,13 +76,12 @@ func (tm *TelegramManager) ListenAndServe(ctx context.Context) error {
 						return
 					}
 
-					tm.mu.Lock()
-					currentUserState, exist := users[update.Message.From.ID]
-					if !exist {
-						currentUserState = UserState{}
-						users[update.Message.From.ID] = currentUserState
+					tm.updateUserState(update)
+					if update.CallbackQuery != nil {
+						if err := tm.processCallbackQuery(update); err != nil {
+							//tm.log.Error("fail to process callback query", "error", err)
+						}
 					}
-					tm.mu.Unlock()
 
 					if update.Message != nil {
 						if err := tm.processMessage(update); err != nil {
@@ -114,9 +120,9 @@ func (tm *TelegramManager) setCommands() error {
 func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 	msg := update.Message
 
-	if update.CallbackQuery != nil {
-		return tm.handleCallback(update)
-	}
+	//if update.CallbackQuery != nil {
+	//	return tm.handleCallback(update)
+	//}
 
 	switch msg.Command() {
 	case commandStart:
@@ -140,7 +146,7 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 	case commandReset:
 		tm.mu.Lock()
 		tm.log.Info("Received /reset command", "user_id", msg.From.ID)
-		users[update.Message.Chat.ID] = UserState{}
+		tm.users[update.Message.Chat.ID] = UserState{}
 		responseMsg := tgbotapi.NewMessage(msg.Chat.ID, "Статус заполнения данных для операции сброшен")
 		if _, err := tm.bot.Send(responseMsg); err != nil {
 			return err
@@ -162,41 +168,73 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 func (tm *TelegramManager) createMainInlineCommands() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Пополнение", "refill"),
-			tgbotapi.NewInlineKeyboardButtonData("Снятие", "remove"),
+			tgbotapi.NewInlineKeyboardButtonData(buttonRefill, buttonRefill),
+			tgbotapi.NewInlineKeyboardButtonData(buttonRemove, buttonRemove),
 		),
 	)
 }
 
-func (tm *TelegramManager) createChooseCategoryInlineCommands() tgbotapi.InlineKeyboardMarkup {
+func (tm *TelegramManager) createRefillCommands() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Продукты", "category_products"),
-			tgbotapi.NewInlineKeyboardButtonData("Транспорт", "category_transport"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Развлечения", "category_entertainment"),
-			tgbotapi.NewInlineKeyboardButtonData("Коммуналка", "category_utility"),
-		),
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Назад", "back_to_main"),
+			tgbotapi.NewInlineKeyboardButtonData("текст", "текст"),
+			tgbotapi.NewInlineKeyboardButtonData("назад", "main"),
 		),
 	)
 }
 
-func (tm *TelegramManager) handleCallback(update tgbotapi.Update) error {
-	msg := update.Message
+// updateUserState updating slice with users to create new user if missed
+// TODO do we really need it?
+func (tm *TelegramManager) updateUserState(update tgbotapi.Update) {
+	if update.Message == nil {
+		return
+	}
+
+	tm.mu.Lock()
+	currentUserState, exist := tm.users[update.Message.From.ID]
+	if !exist {
+		currentUserState = UserState{}
+		tm.users[update.Message.From.ID] = currentUserState
+	}
+	tm.mu.Unlock()
+}
+
+func (tm *TelegramManager) processCallbackQuery(update tgbotapi.Update) error {
+	msg := update.CallbackQuery
 	//chatID := msg.Chat.ID
 	userID := msg.From.ID
 
 	tm.mu.Lock()
-	currentUserState, ok := users[userID]
+	currentUserState, ok := tm.users[userID]
 	if !ok {
 		tm.log.Error("user missed in users map", "userID", userID)
 		currentUserState = UserState{}
-		users[userID] = currentUserState
+		tm.users[userID] = currentUserState
 	}
 	tm.mu.Unlock()
+
+	//switch update.CallbackQuery.Data {
+	//case buttonRefill:
+	//	keyboard := tm.createRefillKeys()
+	//	response := tgbotapi.NewMessage(userID, "ты шо ебанутый?")
+	//	response.ReplyMarkup = keyboard
+	//	if _, err := tm.bot.Send(response); err != nil {
+	//		return err
+	//	}
+	//case buttonRemove:
+	//	response := tgbotapi.NewMessage(userID, "удоляемся")
+	//	if _, err := tm.bot.Send(response); err != nil {
+	//		return err
+	//	}
+	//case buttonBackToMain:
+	//	keyboard := tm.createMainInlineCommands()
+	//	responseMsg := tgbotapi.NewMessage(userID, "Выберите действие")
+	//	responseMsg.ReplyMarkup = keyboard
+	//	_, err := tm.bot.Send(responseMsg)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 
 	return nil
 }
