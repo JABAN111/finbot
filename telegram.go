@@ -37,7 +37,11 @@ func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, d
 	tgConfig := tgbotapi.NewUpdate(offset)
 	tgConfig.Timeout = timeout
 
-	mapButtonActions := map[string]ButtonAction{buttonRefill: RefillButtonAction{}, buttonRemove: RemoveButtonAction{}}
+	mapButtonActions := map[string]ButtonAction{
+		buttonRefill:     RefillButtonAction{},
+		buttonRemove:     RemoveButtonAction{},
+		buttonBackToMain: ReturnToMainButtonAction{},
+	}
 
 	tm := &TelegramManager{
 		bot:        bot,
@@ -76,7 +80,6 @@ func (tm *TelegramManager) ListenAndServe(ctx context.Context) error {
 						return
 					}
 
-					tm.updateUserState(update)
 					if update.CallbackQuery != nil {
 						if err := tm.processCallbackQuery(update); err != nil {
 							//tm.log.Error("fail to process callback query", "error", err)
@@ -175,19 +178,23 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 
 func (tm *TelegramManager) processCallbackQuery(update tgbotapi.Update) error {
 	msg := update.CallbackQuery
-	//chatID := msg.Chat.ID
 	userID := msg.From.ID
 
-	tm.mu.Lock()
-	currentUserState, ok := tm.users[userID]
-	if !ok {
-		tm.log.Error("user missed in users map", "userID", userID)
-		currentUserState = UserState{}
-		tm.users[userID] = currentUserState
-	}
-	tm.mu.Unlock()
+	callbackData := update.CallbackQuery.Data
+	button, ok := tm.actions[callbackData]
 
-	//switch update.CallbackQuery.Data {
+	if !ok {
+		return nil
+	}
+
+	resp, err := button.Action(userID, update)
+	if err != nil {
+		return err
+	}
+	if _, err = tm.bot.Send(resp); err != nil {
+		return err
+	}
+
 	//case buttonRefill:
 	//	keyboard := tm.createRefillKeys()
 	//	response := tgbotapi.NewMessage(userID, "ты шо ебанутый?")

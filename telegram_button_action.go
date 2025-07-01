@@ -31,3 +31,12 @@ func (r RemoveButtonAction) Action(chatID int64, _ tgbotapi.Update) (tgbotapi.Ch
 	response.ReplyMarkup = keyboard
 	return response, nil
 }
+
+type ReturnToMainButtonAction struct{}
+
+func (r ReturnToMainButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	keys := createMainInlineCommands()
+	response := tgbotapi.NewMessage(chatID, "")
+	response.ReplyMarkup = keys
+	return response, nil
+}
