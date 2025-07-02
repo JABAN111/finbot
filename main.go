@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"github.com/dstotijn/go-notion"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/joho/godotenv"
 	"log/slog"
@@ -35,8 +37,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	tgManager := NewTelegramManager(bot, offset, 30, false)
-	if err := tgManager.ListenAndServe(); err != nil {
+	ctx := context.Background()
+	notionSecret := os.Getenv("NOTION_SECRET")
+	if len(notionSecret) == 0 {
+		panic("NOTION_SECRET is not set")
+	}
+	databaseID := os.Getenv("NOTION_DATABASE_ID")
+	if len(databaseID) == 0 {
+		panic("NOTION_DATABASE_ID is not set")
+	}
+
+	storage := NewUserStateStorage()
+	manager := NewNotionManager(notion.NewClient(notionSecret), databaseID)
+
+	tgManager := NewTelegramManager(bot, offset, 30, 2, false, storage, manager)
+	if err := tgManager.ListenAndServe(ctx); err != nil {
 		panic(err)
 	}
 
