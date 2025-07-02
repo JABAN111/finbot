@@ -22,8 +22,6 @@ func createRefillKeys() tgbotapi.InlineKeyboardMarkup {
 func createRemoveKeys() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("удоли меня", "звуки удаления"),
-		), tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("назад", buttonBackToMain),
 		),
 	)

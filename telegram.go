@@ -51,6 +51,13 @@ func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, d
 		},
 	}
 
+	for _, c := range categories {
+		mapButtonActions[c] = CategoryDelegate{
+			storage:      storage,
+			categoryName: c,
+		}
+	}
+
 	tm := &TelegramManager{
 		bot:        bot,
 		log:        GetLogger(),

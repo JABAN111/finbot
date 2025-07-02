@@ -18,6 +18,18 @@ const (
 	buttonSubmitData = "сохранить запись в notion"
 )
 
+const (
+	categoryProducts   = "продукты"
+	categoryFun        = "развлечения"
+	categoryKommunalka = "коммуналка"
+)
+
+var categories = []string{
+	categoryKommunalka,
+	categoryProducts,
+	categoryFun,
+}
+
 type ButtonAction interface {
 	Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error)
 }
@@ -60,7 +72,7 @@ func (r RemoveButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbota
 
 	keys := createRemoveKeys()
 	msgID := update.CallbackQuery.Message.MessageID
-	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, choseAction, keys)
+	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, "Введите сумму", keys)
 	return response, nil
 }
 
@@ -75,8 +87,35 @@ func (r ReturnToMainButtonAction) Action(chatID int64, update tgbotapi.Update) (
 
 type ChooseCategoryButtonAction struct{ storage Storage }
 
-func (c ChooseCategoryButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
-	panic("implement me")
+func (c ChooseCategoryButtonAction) Action(chatID int64, _ tgbotapi.Update) (tgbotapi.Chattable, error) {
+
+	keys := createChooseCategoryButtons(categories)
+
+	resp := tgbotapi.NewMessage(chatID, "Выберите категорию")
+	resp.ReplyMarkup = keys
+	return resp, nil
+}
+
+type CategoryDelegate struct {
+	storage      Storage
+	categoryName string
+}
+
+func (c CategoryDelegate) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	state, err := c.storage.Get(chatID)
+	if err != nil {
+		return nil, err
+	}
+	state.Category = c.categoryName
+	state.isWaitUserInput = true
+	if err = c.storage.Save(chatID, state); err != nil {
+		return nil, err
+	}
+
+	keys := createLeftNoteButtons()
+	msgID := update.CallbackQuery.Message.MessageID
+	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, "отправьте отдельным сообщением комментарий", keys)
+	return response, nil
 }
 
 type LeftNoteButtonAction struct{ storage Storage }
