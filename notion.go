@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+type NotionDatabase interface {
+	InsertOperation(ctx context.Context, operationDTO InsertOperationDto) error
+}
+
 type OperationStatus string
 
 const (
@@ -32,14 +36,16 @@ var (
 )
 
 type NotionManager struct {
-	log    *slog.Logger
-	client *notion.Client
+	log        *slog.Logger
+	client     *notion.Client
+	databaseID string
 }
 
-func NewNotionManager(client *notion.Client) NotionManager {
+func NewNotionManager(client *notion.Client, databaseID string) NotionManager {
 	return NotionManager{
-		log:    GetLogger(),
-		client: client,
+		log:        GetLogger(),
+		databaseID: databaseID,
+		client:     client,
 	}
 }
 
@@ -51,7 +57,7 @@ type InsertOperationDto struct {
 	Comment  string
 }
 
-func (n NotionManager) InsertOperation(ctx context.Context, databaseID string, operationDTO InsertOperationDto) error {
+func (n NotionManager) InsertOperation(ctx context.Context, operationDTO InsertOperationDto) error {
 	if operationDTO.Status != OperationStatusRefill && operationDTO.Status != OperationRemove {
 		return errInvalidOperationStatus
 	}
@@ -101,7 +107,7 @@ func (n NotionManager) InsertOperation(ctx context.Context, databaseID string, o
 
 	params := notion.CreatePageParams{
 		ParentType:             notion.ParentTypeDatabase,
-		ParentID:               databaseID,
+		ParentID:               n.databaseID,
 		DatabasePageProperties: &props,
 	}
 

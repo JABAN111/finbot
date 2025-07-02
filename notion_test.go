@@ -113,8 +113,8 @@ func TestNotionManager_InsertOperation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			notionClient := getNotionClient()
-			nm := NewNotionManager(notionClient)
-			if err := nm.InsertOperation(ctx, databaseID, tt.dto); (err != nil) != tt.wantErr {
+			nm := NewNotionManager(notionClient, databaseID)
+			if err := nm.InsertOperation(ctx, tt.dto); (err != nil) != tt.wantErr {
 				t.Errorf("InsertOperation() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
