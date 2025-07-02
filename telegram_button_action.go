@@ -30,7 +30,7 @@ func (r RefillButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbota
 		return nil, err
 	}
 	state.isWaitUserInput = true
-	state.Status = buttonRefill
+	state.Status = OperationStatusRefill
 	state.UserStateCurrentOperation = settingSum
 	if err = r.storage.Save(chatID, state); err != nil {
 		return nil, err
@@ -94,8 +94,9 @@ func (l LeftNoteButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbo
 	}
 
 	keys := createLeftNoteButtons()
-	msgID := update.CallbackQuery.Message.MessageID
-	return tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, choseAction, keys), nil
+	response := tgbotapi.NewMessage(chatID, "отправьте отдельным сообщением комментарий")
+	response.ReplyMarkup = keys
+	return response, nil
 }
 
 type SubmitButtonAction struct {

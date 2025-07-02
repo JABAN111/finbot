@@ -16,7 +16,7 @@ const (
 	beginOperation = iota
 	settingSum
 	choosingCategory
-	choosingComment
+	choosingNote
 )
 
 var (

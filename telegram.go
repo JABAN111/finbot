@@ -40,10 +40,11 @@ func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, d
 	tgConfig.Timeout = timeout
 
 	mapButtonActions := map[string]ButtonAction{
-		buttonRefill:     RefillButtonAction{storage: storage},
-		buttonRemove:     RemoveButtonAction{storage: storage},
-		buttonBackToMain: ReturnToMainButtonAction{storage: storage},
-		buttonLeftNote:   LeftNoteButtonAction{storage: storage},
+		buttonRefill:         RefillButtonAction{storage: storage},
+		buttonRemove:         RemoveButtonAction{storage: storage},
+		buttonBackToMain:     ReturnToMainButtonAction{storage: storage},
+		buttonLeftNote:       LeftNoteButtonAction{storage: storage},
+		buttonChooseCategory: ChooseCategoryButtonAction{storage: storage},
 		buttonSubmitData: SubmitButtonAction{
 			storage:        storage,
 			notionDatabase: manager,
@@ -173,29 +174,54 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 				return errors.New("user attempt to enter negative sum")
 			}
 
-			userState.isWaitUserInput = false
+			//todo simplify?
+			if userState.Status == OperationStatusRefill {
+				userState.UserStateCurrentOperation = choosingNote
+				if err = tm.storage.Save(userID, userState); err != nil {
+					return err
+				}
+				button, ok := tm.actions[buttonLeftNote]
+				if !ok {
+					return fmt.Errorf("internal error: no action found for left note")
+				}
+
+				buttonResponse, err := button.Action(update.Message.From.ID, update)
+				if err != nil {
+					return err
+				}
+				if _, err := tm.bot.Send(buttonResponse); err != nil {
+					tm.log.Error("fail to send button response", "error", err)
+					return err
+				}
+			} else {
+				userState.UserStateCurrentOperation = choosingCategory
+				if err = tm.storage.Save(userID, userState); err != nil {
+					return err
+				}
+				button, ok := tm.actions[buttonChooseCategory]
+				if !ok {
+					return fmt.Errorf("internal error: no action found for buttonChooseCategory")
+				}
+				buttonResponse, err := button.Action(update.Message.From.ID, update)
+				if err != nil {
+					return err
+				}
+				if _, err := tm.bot.Send(buttonResponse); err != nil {
+					tm.log.Error("fail to send button response", "error", err)
+					return err
+				}
+			}
 			userState.OperationSum = sum
 			if err := tm.storage.Save(update.Message.From.ID, userState); err != nil {
 				tm.log.Error("fail to save user state", "error", err)
 				return err
 			}
 			tm.log.Info("user entered sum", "user_id", update.Message.From.ID, "updated user state", userState)
+		case choosingNote:
+			panic("implement me")
+			//noteText := strings.TrimSpace(msg.Text)
+			//userState.
 
-			if userState.Status == OperationStatusRefill {
-				userState.isWaitUserInput = true
-
-			} else {
-				keys, ok := tm.actions[buttonChooseCategory]
-				if !ok {
-					tm.log.Error("fail to get action keys", "expect button", buttonChooseCategory)
-					return tm.sendUnexpectedErrMsg(update)
-				}
-				response := tgbotapi.NewMessage(update.Message.From.ID, buttonChooseCategory)
-				response.ReplyMarkup = keys
-				if _, err := tm.bot.Send(response); err != nil {
-					return err
-				}
-			}
 		}
 	}
 
