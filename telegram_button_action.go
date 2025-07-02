@@ -8,6 +8,8 @@ const (
 	buttonRefill = "пополнить"
 	buttonRemove = "снятие"
 
+	buttonChooseCategory = "выберите категорию"
+
 	buttonBackToMain = "вернуться к стартовой странице"
 )
 

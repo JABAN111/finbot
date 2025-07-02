@@ -80,6 +80,11 @@ func (tm *TelegramManager) ListenAndServe(ctx context.Context) error {
 						return
 					}
 
+					if err := tm.createUserIfMissed(update); err != nil {
+						tm.log.Error("fail to create user", "error", err)
+						continue
+					}
+
 					if update.CallbackQuery != nil {
 						if err := tm.processCallbackQuery(update); err != nil {
 							//tm.log.Error("fail to process callback query", "error", err)
@@ -124,21 +129,15 @@ func (tm *TelegramManager) setCommands() error {
 
 func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 	msg := update.Message
+	userID := update.Message.From.ID
+
 	if msg.IsCommand() {
 		return tm.processCommand(update)
 	}
 
-	userState, err := tm.storage.Get(msg.From.ID)
+	userState, err := tm.storage.Get(userID)
 	if err != nil {
-		if !errors.Is(err, errUserNotFound) {
-			tm.log.Error("fail to get user state", "error", err)
-			return err
-		}
-		if err := tm.storage.Save(update.Message.From.ID, UserState{}); err != nil {
-			return err
-		}
-		tm.log.Info("missed user created state", "user_id", update.Message.From.ID)
-		userState = UserState{}
+		return err
 	}
 
 	if !userState.isWaitUserInput {
@@ -175,6 +174,17 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 				return err
 			}
 			tm.log.Info("user entered sum", "user_id", update.Message.From.ID, "updated user state", userState)
+
+			keys, ok := tm.actions[buttonChooseCategory]
+			if !ok {
+				return tm.sendUnexpectedErrMsg(update)
+			}
+			response := tgbotapi.NewMessage(update.Message.From.ID, buttonChooseCategory)
+			response.ReplyMarkup = keys
+			if _, err := tm.bot.Send(response); err != nil {
+				return err
+			}
+
 			return nil
 		}
 	}
@@ -245,28 +255,6 @@ func (tm *TelegramManager) processCallbackQuery(update tgbotapi.Update) error {
 	}
 	tm.log.Info("sent message to user", "user_id", userID, "command", callbackData)
 
-	//case buttonRefill:
-	//	keyboard := tm.createRefillKeys()
-	//	response := tgbotapi.NewMessage(userID, "ты шо ебанутый?")
-	//	response.ReplyMarkup = keyboard
-	//	if _, err := tm.bot.Send(response); err != nil {
-	//		return err
-	//	}
-	//case buttonRemove:
-	//	response := tgbotapi.NewMessage(userID, "удоляемся")
-	//	if _, err := tm.bot.Send(response); err != nil {
-	//		return err
-	//	}
-	//case buttonBackToMain:
-	//	keyboard := tm.createMainInlineCommands()
-	//	responseMsg := tgbotapi.NewMessage(userID, "Выберите действие")
-	//	responseMsg.ReplyMarkup = keyboard
-	//	_, err := tm.bot.Send(responseMsg)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
-
 	return nil
 }
 
@@ -289,4 +277,28 @@ func (tm *TelegramManager) sendSpecificErrMsg(msgText string, update tgbotapi.Up
 
 func (tm *TelegramManager) sendUnexpectedErrMsg(update tgbotapi.Update) error {
 	return tm.sendSpecificErrMsg("произошла ошибка при обработке ваших ответов и/или внутренняя\nначните заново", update)
+}
+
+func (tm *TelegramManager) createUserIfMissed(update tgbotapi.Update) error {
+	msg := update.Message
+
+	_, err := tm.storage.Get(msg.From.ID)
+	if err == nil {
+		return nil
+	}
+
+	if !errors.Is(err, errUserNotFound) {
+		tm.log.Error("fail to get user state", "error", err)
+		return err
+	}
+	if err := tm.storage.Save(update.Message.From.ID, UserState{}); err != nil {
+		return err
+	}
+	tm.log.Info("missed user created state", "user_id", update.Message.From.ID)
+	if err := tm.storage.Save(msg.From.ID, UserState{}); err != nil {
+		tm.log.Error("fail to save user state", "error", err)
+		return err
+	}
+
+	return nil
 }
