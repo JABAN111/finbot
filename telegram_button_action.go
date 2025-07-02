@@ -18,9 +18,21 @@ type ButtonAction interface {
 type RefillButtonAction struct{ storage Storage }
 
 func (r RefillButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	state, err := r.storage.Get(chatID)
+	if err != nil {
+		return nil, err
+	}
+	state.isWaitUserInput = true
+	state.Status = buttonRefill
+	state.UserStateCurrentOperation = settingSum
+	if err = r.storage.Save(chatID, state); err != nil {
+		return nil, err
+	}
+
 	keys := createRefillKeys()
+
 	msgID := update.CallbackQuery.Message.MessageID
-	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, choseAction, keys)
+	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, "Введите сумму операции", keys)
 
 	return response, nil
 }
@@ -28,6 +40,17 @@ func (r RefillButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbota
 type RemoveButtonAction struct{ storage Storage }
 
 func (r RemoveButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	state, err := r.storage.Get(chatID)
+	if err != nil {
+		return nil, err
+	}
+	state.isWaitUserInput = true
+	state.Status = buttonRemove
+	state.UserStateCurrentOperation = settingSum
+	if err = r.storage.Save(chatID, state); err != nil {
+		return nil, err
+	}
+
 	keys := createRemoveKeys()
 	msgID := update.CallbackQuery.Message.MessageID
 	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, choseAction, keys)

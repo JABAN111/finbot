@@ -14,8 +14,6 @@ func createMainInlineCommands() tgbotapi.InlineKeyboardMarkup {
 func createRefillKeys() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("текст", "текст"),
-		), tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("назад", buttonBackToMain),
 		),
 	)

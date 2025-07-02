@@ -15,7 +15,6 @@ type Storage interface {
 const (
 	beginOperation = iota
 	settingSum
-	choosingStatus
 	choosingCategory
 	choosingComment
 )
