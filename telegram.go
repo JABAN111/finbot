@@ -6,6 +6,8 @@ import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log/slog"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -122,6 +124,9 @@ func (tm *TelegramManager) setCommands() error {
 
 func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 	msg := update.Message
+	if msg.IsCommand() {
+		return tm.processCommand(update)
+	}
 
 	userState, err := tm.storage.Get(msg.From.ID)
 	if err != nil {
@@ -136,15 +141,49 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 		userState = UserState{}
 	}
 
-	if !msg.IsCommand() && !userState.isWaitUserInput {
+	if !userState.isWaitUserInput {
 		tm.log.Info("message is not command", "user_id", userState, "text", msg.Text)
 		response := tgbotapi.NewMessage(update.Message.Chat.ID, "все хиханьки хаханьки тебе? Жмякни по /start")
 		if _, err := tm.bot.Send(response); err != nil {
 			return err
 		}
-
 		return nil
 	}
+
+	if userState.isWaitUserInput {
+		userInput := msg.Text
+		tm.log.Info("got expected input from user", "user_id", update.Message.From.ID, "userInput", userInput)
+
+		switch userState.UserStateCurrentOperation {
+		case settingSum:
+			sum, err := strconv.ParseFloat(strings.TrimSpace(userInput), 64)
+			if err != nil {
+				_ = tm.sendSpecificErrMsg("не удалось прочесть сумму, пожалуйста введите в формате 0.321", update)
+				return fmt.Errorf("fail to parse sum value: %w", err)
+			}
+
+			if sum < 0 {
+				tm.log.Warn("user attempt to enter negative sum")
+				_ = tm.sendSpecificErrMsg("сумма должна быть положительным числом", update)
+				return errors.New("user attempt to enter negative sum")
+			}
+
+			userState.isWaitUserInput = false
+			userState.OperationSum = sum
+			if err := tm.storage.Save(update.Message.From.ID, userState); err != nil {
+				tm.log.Error("fail to save user state", "error", err)
+				return err
+			}
+			tm.log.Info("user entered sum", "user_id", update.Message.From.ID, "updated user state", userState)
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func (tm *TelegramManager) processCommand(update tgbotapi.Update) error {
+	msg := update.Message
 
 	switch msg.Command() {
 	case commandStart:
@@ -183,7 +222,6 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 		}
 		return errUnknownCommand
 	}
-
 	return nil
 }
 
@@ -230,4 +268,25 @@ func (tm *TelegramManager) processCallbackQuery(update tgbotapi.Update) error {
 	//}
 
 	return nil
+}
+
+func (tm *TelegramManager) sendSpecificErrMsg(msgText string, update tgbotapi.Update) error {
+	msg := update.Message
+	userID := msg.From.ID
+
+	errResp := tgbotapi.NewMessage(userID, msgText)
+	if err := tm.storage.Reset(userID); err != nil {
+		tm.log.Error("fail to reset user before sending error msg", "user_id", userID, "error", err)
+		return err
+	}
+
+	if _, err := tm.bot.Send(errResp); err != nil {
+		tm.log.Error("fail to send error msg", "user_id", userID, "error", err)
+		return err
+	}
+	return nil
+}
+
+func (tm *TelegramManager) sendUnexpectedErrMsg(update tgbotapi.Update) error {
+	return tm.sendSpecificErrMsg("произошла ошибка при обработке ваших ответов и/или внутренняя\nначните заново", update)
 }
