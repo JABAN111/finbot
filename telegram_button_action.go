@@ -2,6 +2,8 @@ package main
 
 import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
+const choseAction = "выберите действие"
+
 const (
 	buttonRefill = "пополнить"
 	buttonRemove = "снятие"
@@ -15,20 +17,20 @@ type ButtonAction interface {
 
 type RefillButtonAction struct{}
 
-func (r RefillButtonAction) Action(chatID int64, _ tgbotapi.Update) (tgbotapi.Chattable, error) {
-	keyboard := createRefillKeys()
-	response := tgbotapi.NewMessage(chatID, "ты шо ебанутый?")
-	response.ReplyMarkup = keyboard
+func (r RefillButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	keys := createRefillKeys()
+	msgID := update.CallbackQuery.Message.MessageID
+	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, choseAction, keys)
 
 	return response, nil
 }
 
 type RemoveButtonAction struct{}
 
-func (r RemoveButtonAction) Action(chatID int64, _ tgbotapi.Update) (tgbotapi.Chattable, error) {
-	keyboard := createRemoveKeys()
-	response := tgbotapi.NewMessage(chatID, "Шо")
-	response.ReplyMarkup = keyboard
+func (r RemoveButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	keys := createRemoveKeys()
+	msgID := update.CallbackQuery.Message.MessageID
+	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, choseAction, keys)
 	return response, nil
 }
 
@@ -36,7 +38,7 @@ type ReturnToMainButtonAction struct{}
 
 func (r ReturnToMainButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
 	keys := createMainInlineCommands()
-	response := tgbotapi.NewMessage(chatID, "")
-	response.ReplyMarkup = keys
+	msgID := update.CallbackQuery.Message.MessageID
+	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, choseAction, keys)
 	return response, nil
 }

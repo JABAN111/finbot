@@ -194,6 +194,7 @@ func (tm *TelegramManager) processCallbackQuery(update tgbotapi.Update) error {
 	if _, err = tm.bot.Send(resp); err != nil {
 		return err
 	}
+	tm.log.Info("sent message to user", "user_id", userID, "command", callbackData)
 
 	//case buttonRefill:
 	//	keyboard := tm.createRefillKeys()
