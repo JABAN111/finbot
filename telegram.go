@@ -17,10 +17,12 @@ var (
 )
 
 const (
-	commandStart = "start"
-	commandHelp  = "help"
-	commandReset = "reset"
+	commandStart  = "start"
+	commandHelp   = "help"
+	commandReset  = "reset"
+	commandGetWeb = "notion"
 )
+const linkToNotion = "https://vivid-expansion-951.notion.site/21d3d8e126bf8022a26dc42a29697985?v=21d3d8e126bf80e1a2c4000c7cbdba02&pvs=74"
 
 type TelegramManager struct {
 	numWorkers   int
@@ -135,7 +137,9 @@ func (tm *TelegramManager) setCommands() error {
 	}, tgbotapi.BotCommand{
 		Command:     commandReset,
 		Description: "Сбрасывает состояние заполнение данных для операции",
-	})
+	}, tgbotapi.BotCommand{
+		Command:     commandGetWeb,
+		Description: "Возвращает ссылку на notion"})
 
 	_, err := tm.bot.Request(cfg)
 	return err
@@ -271,6 +275,18 @@ func (tm *TelegramManager) processCommand(update tgbotapi.Update) error {
 			return err
 		}
 		responseMsg := tgbotapi.NewMessage(msg.Chat.ID, "Статус заполнения данных для операции сброшен")
+		if _, err := tm.bot.Send(responseMsg); err != nil {
+			return err
+		}
+	case commandGetWeb:
+		tm.log.Info("Received /get web command", "user_id", msg.From.ID)
+		btn := tgbotapi.NewInlineKeyboardButtonURL("Открыть в Notion", linkToNotion)
+		keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(btn),
+		)
+		responseMsg := tgbotapi.NewMessage(msg.Chat.ID, "Нажмите кнопку ниже, чтобы перейти в Notion:")
+		responseMsg.ReplyMarkup = keyboard
+
 		if _, err := tm.bot.Send(responseMsg); err != nil {
 			return err
 		}
