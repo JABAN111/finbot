@@ -37,7 +37,9 @@ func main() {
 	}
 
 	ctx := context.Background()
-	tgManager := NewTelegramManager(bot, offset, 30, 2, false)
+
+	storage := NewUserStateStorage()
+	tgManager := NewTelegramManager(bot, offset, 30, 2, false, storage)
 	if err := tgManager.ListenAndServe(ctx); err != nil {
 		panic(err)
 	}

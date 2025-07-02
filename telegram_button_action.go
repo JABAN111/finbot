@@ -15,7 +15,7 @@ type ButtonAction interface {
 	Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error)
 }
 
-type RefillButtonAction struct{}
+type RefillButtonAction struct{ storage Storage }
 
 func (r RefillButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
 	keys := createRefillKeys()
@@ -25,7 +25,7 @@ func (r RefillButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbota
 	return response, nil
 }
 
-type RemoveButtonAction struct{}
+type RemoveButtonAction struct{ storage Storage }
 
 func (r RemoveButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
 	keys := createRemoveKeys()
@@ -34,7 +34,7 @@ func (r RemoveButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbota
 	return response, nil
 }
 
-type ReturnToMainButtonAction struct{}
+type ReturnToMainButtonAction struct{ storage Storage }
 
 func (r ReturnToMainButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
 	keys := createMainInlineCommands()

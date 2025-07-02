@@ -25,30 +25,28 @@ type TelegramManager struct {
 	bot          *tgbotapi.BotAPI
 	updateConfig tgbotapi.UpdateConfig
 	log          *slog.Logger
-	mu           sync.Mutex
 
-	users   map[int64]UserState
+	storage Storage
 	actions map[string]ButtonAction
 }
 
-func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, debug bool) *TelegramManager {
+func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, debug bool, storage Storage) *TelegramManager {
 	bot.Debug = debug
 
 	tgConfig := tgbotapi.NewUpdate(offset)
 	tgConfig.Timeout = timeout
 
 	mapButtonActions := map[string]ButtonAction{
-		buttonRefill:     RefillButtonAction{},
-		buttonRemove:     RemoveButtonAction{},
-		buttonBackToMain: ReturnToMainButtonAction{},
+		buttonRefill:     RefillButtonAction{storage: storage},
+		buttonRemove:     RemoveButtonAction{storage: storage},
+		buttonBackToMain: ReturnToMainButtonAction{storage: storage},
 	}
 
 	tm := &TelegramManager{
 		bot:        bot,
 		log:        GetLogger(),
 		numWorkers: numWorkers,
-		users:      make(map[int64]UserState),
-		mu:         sync.Mutex{},
+		storage:    storage,
 		actions:    mapButtonActions,
 	}
 
@@ -86,13 +84,15 @@ func (tm *TelegramManager) ListenAndServe(ctx context.Context) error {
 						}
 					}
 
-					if update.Message != nil {
-						if err := tm.processMessage(update); err != nil {
-							if errors.Is(err, errUnknownCommand) {
-								continue
-							}
-							tm.log.Error("fail to process command", "error", err, "user_id", update.Message.From.ID)
+					if update.Message == nil {
+						continue
+					}
+
+					if err := tm.processMessage(update); err != nil {
+						if errors.Is(err, errUnknownCommand) {
+							continue
 						}
+						tm.log.Error("fail to process command", "error", err, "user_id", update.Message.From.ID)
 					}
 
 				}
@@ -123,7 +123,18 @@ func (tm *TelegramManager) setCommands() error {
 func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 	msg := update.Message
 
-	userState := tm.getCurrentUserState(msg.From.ID)
+	userState, err := tm.storage.Get(msg.From.ID)
+	if err != nil {
+		if !errors.Is(err, errUserNotFound) {
+			tm.log.Error("fail to get user state", "error", err)
+			return err
+		}
+		if err := tm.storage.Save(update.Message.From.ID, UserState{}); err != nil {
+			return err
+		}
+		tm.log.Info("missed user created state", "user_id", update.Message.From.ID)
+		userState = UserState{}
+	}
 
 	if !msg.IsCommand() && !userState.isWaitUserInput {
 		tm.log.Info("message is not command", "user_id", userState, "text", msg.Text)
@@ -155,14 +166,14 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 		}
 
 	case commandReset:
-		tm.mu.Lock()
 		tm.log.Info("Received /reset command", "user_id", msg.From.ID)
-		tm.users[update.Message.Chat.ID] = UserState{}
+		if err := tm.storage.Reset(update.Message.Chat.ID); err != nil {
+			return err
+		}
 		responseMsg := tgbotapi.NewMessage(msg.Chat.ID, "Статус заполнения данных для операции сброшен")
 		if _, err := tm.bot.Send(responseMsg); err != nil {
 			return err
 		}
-		tm.mu.Unlock()
 
 	default:
 		tm.log.Warn("Received unknown command", "command", msg.Command(), "user_id", msg.From.ID)
@@ -219,16 +230,4 @@ func (tm *TelegramManager) processCallbackQuery(update tgbotapi.Update) error {
 	//}
 
 	return nil
-}
-
-func (tm *TelegramManager) getCurrentUserState(userID int64) UserState {
-	usState, ok := tm.users[userID]
-
-	if !ok {
-		tm.mu.Lock()
-		tm.users[userID] = UserState{}
-		tm.mu.Unlock()
-	}
-
-	return usState
 }
