@@ -105,14 +105,26 @@ type SubmitButtonAction struct {
 }
 
 func (s SubmitButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	var username string
+	if update.CallbackQuery != nil {
+		username = update.CallbackQuery.From.UserName
+	} else {
+		username = update.Message.From.UserName
+	}
+
 	userState, err := s.storage.Get(chatID)
 	if err != nil {
 		return nil, err
 	}
 
+	category := userState.Category
+	if userState.Status == OperationStatusRefill {
+		category = "пополнение"
+	}
+
 	dto := InsertOperationDto{
-		Creator:  update.CallbackQuery.From.UserName,
-		Category: userState.Category,
+		Creator:  username,
+		Category: category,
 		Sum:      userState.OperationSum,
 		Status:   userState.Status,
 		Comment:  userState.Comment,

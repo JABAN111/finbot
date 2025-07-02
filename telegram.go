@@ -218,10 +218,18 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 			}
 			tm.log.Info("user entered sum", "user_id", update.Message.From.ID, "updated user state", userState)
 		case choosingNote:
-			panic("implement me")
-			//noteText := strings.TrimSpace(msg.Text)
-			//userState.
+			button, ok := tm.actions[buttonSubmitData]
+			if !ok {
+				return fmt.Errorf("internal error: no action found for buttonSubmitData")
+			}
 
+			buttonResponse, err := button.Action(update.Message.From.ID, update)
+			if err != nil {
+				return err
+			}
+			if _, err := tm.bot.Send(buttonResponse); err != nil {
+				tm.log.Error("fail to send button response", "error", err)
+			}
 		}
 	}
 
