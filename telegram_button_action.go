@@ -64,7 +64,7 @@ func (r RemoveButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbota
 		return nil, err
 	}
 	state.isWaitUserInput = true
-	state.Status = buttonRemove
+	state.Status = OperationRemove
 	state.UserStateCurrentOperation = settingSum
 	if err = r.storage.Save(chatID, state); err != nil {
 		return nil, err
