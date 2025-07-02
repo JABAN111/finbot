@@ -1,16 +1,21 @@
 package main
 
-import tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+import (
+	"context"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+)
 
 const choseAction = "выберите действие"
 
 const (
-	buttonRefill = "пополнить"
-	buttonRemove = "снятие"
-
+	buttonRefill         = "пополнить"
+	buttonRemove         = "снятие"
 	buttonChooseCategory = "выберите категорию"
+	buttonLeftNote       = "оставить комментарий"
 
 	buttonBackToMain = "вернуться к стартовой странице"
+
+	buttonSubmitData = "сохранить запись в notion"
 )
 
 type ButtonAction interface {
@@ -66,4 +71,60 @@ func (r ReturnToMainButtonAction) Action(chatID int64, update tgbotapi.Update) (
 	msgID := update.CallbackQuery.Message.MessageID
 	response := tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, choseAction, keys)
 	return response, nil
+}
+
+type ChooseCategoryButtonAction struct{ storage Storage }
+
+func (c ChooseCategoryButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	panic("implement me")
+}
+
+type LeftNoteButtonAction struct{ storage Storage }
+
+func (l LeftNoteButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	userState, err := l.storage.Get(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	msg := update.Message.Text
+	userState.Comment = msg
+	if err = l.storage.Save(chatID, userState); err != nil {
+		return nil, err
+	}
+
+	keys := createLeftNoteButtons()
+	msgID := update.CallbackQuery.Message.MessageID
+	return tgbotapi.NewEditMessageTextAndMarkup(chatID, msgID, choseAction, keys), nil
+}
+
+type SubmitButtonAction struct {
+	storage        Storage
+	notionDatabase NotionDatabase
+}
+
+func (s SubmitButtonAction) Action(chatID int64, update tgbotapi.Update) (tgbotapi.Chattable, error) {
+	userState, err := s.storage.Get(chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	dto := InsertOperationDto{
+		Creator:  update.CallbackQuery.From.UserName,
+		Category: userState.Category,
+		Sum:      userState.OperationSum,
+		Status:   userState.Status,
+		Comment:  userState.Comment,
+	}
+
+	if err = s.notionDatabase.InsertOperation(context.Background(), dto); err != nil {
+		return nil, err
+	}
+
+	if err := s.storage.Reset(chatID); err != nil {
+		return nil, err
+	}
+
+	responseMsg := tgbotapi.NewMessage(chatID, "Данные успешно отправлены")
+	return responseMsg, nil
 }

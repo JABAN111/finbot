@@ -29,10 +29,11 @@ type TelegramManager struct {
 	log          *slog.Logger
 
 	storage Storage
+	manager NotionManager
 	actions map[string]ButtonAction
 }
 
-func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, debug bool, storage Storage) *TelegramManager {
+func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, debug bool, storage Storage, manager NotionManager) *TelegramManager {
 	bot.Debug = debug
 
 	tgConfig := tgbotapi.NewUpdate(offset)
@@ -42,6 +43,11 @@ func NewTelegramManager(bot *tgbotapi.BotAPI, offset, timeout, numWorkers int, d
 		buttonRefill:     RefillButtonAction{storage: storage},
 		buttonRemove:     RemoveButtonAction{storage: storage},
 		buttonBackToMain: ReturnToMainButtonAction{storage: storage},
+		buttonLeftNote:   LeftNoteButtonAction{storage: storage},
+		buttonSubmitData: SubmitButtonAction{
+			storage:        storage,
+			notionDatabase: manager,
+		},
 	}
 
 	tm := &TelegramManager{
@@ -87,7 +93,7 @@ func (tm *TelegramManager) ListenAndServe(ctx context.Context) error {
 
 					if update.CallbackQuery != nil {
 						if err := tm.processCallbackQuery(update); err != nil {
-							//tm.log.Error("fail to process callback query", "error", err)
+							tm.log.Error("fail to process callback query", "error", err)
 						}
 					}
 
@@ -175,17 +181,21 @@ func (tm *TelegramManager) processMessage(update tgbotapi.Update) error {
 			}
 			tm.log.Info("user entered sum", "user_id", update.Message.From.ID, "updated user state", userState)
 
-			keys, ok := tm.actions[buttonChooseCategory]
-			if !ok {
-				return tm.sendUnexpectedErrMsg(update)
-			}
-			response := tgbotapi.NewMessage(update.Message.From.ID, buttonChooseCategory)
-			response.ReplyMarkup = keys
-			if _, err := tm.bot.Send(response); err != nil {
-				return err
-			}
+			if userState.Status == OperationStatusRefill {
+				userState.isWaitUserInput = true
 
-			return nil
+			} else {
+				keys, ok := tm.actions[buttonChooseCategory]
+				if !ok {
+					tm.log.Error("fail to get action keys", "expect button", buttonChooseCategory)
+					return tm.sendUnexpectedErrMsg(update)
+				}
+				response := tgbotapi.NewMessage(update.Message.From.ID, buttonChooseCategory)
+				response.ReplyMarkup = keys
+				if _, err := tm.bot.Send(response); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -280,9 +290,18 @@ func (tm *TelegramManager) sendUnexpectedErrMsg(update tgbotapi.Update) error {
 }
 
 func (tm *TelegramManager) createUserIfMissed(update tgbotapi.Update) error {
-	msg := update.Message
+	var chatID int64
 
-	_, err := tm.storage.Get(msg.From.ID)
+	msg := update.Message
+	callbackQuery := update.CallbackQuery
+	if msg != nil {
+		chatID = msg.Chat.ID
+	}
+	if callbackQuery != nil {
+		chatID = callbackQuery.From.ID
+	}
+
+	_, err := tm.storage.Get(chatID)
 	if err == nil {
 		return nil
 	}
@@ -291,11 +310,11 @@ func (tm *TelegramManager) createUserIfMissed(update tgbotapi.Update) error {
 		tm.log.Error("fail to get user state", "error", err)
 		return err
 	}
-	if err := tm.storage.Save(update.Message.From.ID, UserState{}); err != nil {
+	if err := tm.storage.Save(chatID, UserState{}); err != nil {
 		return err
 	}
-	tm.log.Info("missed user created state", "user_id", update.Message.From.ID)
-	if err := tm.storage.Save(msg.From.ID, UserState{}); err != nil {
+	tm.log.Info("missed user created state", "chat_id", chatID)
+	if err := tm.storage.Save(chatID, UserState{}); err != nil {
 		tm.log.Error("fail to save user state", "error", err)
 		return err
 	}
